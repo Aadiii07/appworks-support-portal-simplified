@@ -20,6 +20,9 @@ public class CustomerMetricResponse {
     private Long customerId;
     private MetricResponse metric;
     private boolean enabled;
+    private String gatewayEndpointUrl;
+    private String serviceName;
+    private String namespace;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -29,6 +32,9 @@ public class CustomerMetricResponse {
                 .customerId(cm.getCustomer().getId())
                 .metric(MetricResponse.fromEntity(cm.getMetric()))
                 .enabled(cm.isEnabled())
+                .gatewayEndpointUrl(cm.getGatewayEndpointUrl())
+                .serviceName(cm.getServiceName())
+                .namespace(cm.getNamespace())
                 .createdAt(cm.getCreatedAt())
                 .updatedAt(cm.getUpdatedAt())
                 .build();

@@ -396,10 +396,28 @@
       <label>Metric</label>
       <select id="assign-metric"></select>
     </div>
+    <div class="field"><label>Gateway Endpoint URL</label><input id="assign-gateway-url" placeholder="https://acme.appworks.com/soap/gateway"></div>
+    <div class="field"><label>Service Name</label><input id="assign-service-name" placeholder="CustomerHealthCheckService"></div>
+    <div class="field"><label>Namespace</label><input id="assign-namespace" placeholder="http://appworks.opentext.com/services"></div>
     <div id="assign-error" class="error-note"></div>
     <div class="form-footer">
       <button class="btn secondary" onclick="closeOverlay('assign-overlay')">Cancel</button>
       <button class="btn" onclick="assignMetricSubmit()">Assign</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit SOAP Config overlay -->
+<div class="overlay" id="soap-config-overlay">
+  <div class="side-panel">
+    <div class="panel-header"><h2>Edit SOAP Config</h2><button class="close-x" onclick="closeOverlay('soap-config-overlay')">✕</button></div>
+    <div class="field"><label>Gateway Endpoint URL</label><input id="soap-config-gateway-url"></div>
+    <div class="field"><label>Service Name</label><input id="soap-config-service-name"></div>
+    <div class="field"><label>Namespace</label><input id="soap-config-namespace"></div>
+    <div id="soap-config-error" class="error-note"></div>
+    <div class="form-footer">
+      <button class="btn secondary" onclick="closeOverlay('soap-config-overlay')">Cancel</button>
+      <button class="btn" onclick="submitSoapConfig()">Save</button>
     </div>
   </div>
 </div>
@@ -418,10 +436,47 @@
   </div>
 </div>
 
+<!-- Configure Alert Settings overlay -->
+<div class="overlay" id="alert-overlay">
+  <div class="side-panel">
+    <div class="panel-header"><h2>Alert Settings</h2><button class="close-x" onclick="closeOverlay('alert-overlay')">✕</button></div>
+    <div class="field">
+      <label>Alert Frequency</label>
+      <select id="alert-frequency">
+        <option value="EVERY_FAILURE">Every failure</option>
+        <option value="HOURLY">At most hourly</option>
+        <option value="DAILY">At most daily</option>
+      </select>
+    </div>
+    <div class="field">
+      <label><input type="checkbox" id="alert-enabled" checked style="width:auto; margin-right:6px;">Alerts enabled</label>
+    </div>
+    <div id="alert-error" class="error-note"></div>
+    <div class="form-footer">
+      <button class="btn secondary" onclick="closeOverlay('alert-overlay')">Cancel</button>
+      <button class="btn" onclick="submitAlertConfig()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Alert Recipient overlay -->
+<div class="overlay" id="recipient-overlay">
+  <div class="side-panel">
+    <div class="panel-header"><h2>Add Recipient</h2><button class="close-x" onclick="closeOverlay('recipient-overlay')">✕</button></div>
+    <div class="field"><label>Email Address</label><input id="recipient-email" placeholder="oncall@acme.com"></div>
+    <div id="recipient-error" class="error-note"></div>
+    <div class="form-footer">
+      <button class="btn secondary" onclick="closeOverlay('recipient-overlay')">Cancel</button>
+      <button class="btn" onclick="submitAddRecipient()">Add Recipient</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API = '';
 let currentRoute = 'dashboard';
 let selectedCustomerId = null;
+let soapConfigTargetId = null;
 let cache = { customers: [], metrics: [] };
 
 // ---------- utilities ----------
@@ -630,6 +685,20 @@ async function renderCustomerDetail(id) {
     api('GET', '/api/v1/customers/' + id + '/metrics')
   ]);
 
+  // Alert configuration is optional — a customer may not have one set up yet,
+  // in which case the API 404s. That's an expected state here, not an error,
+  // so it's handled separately rather than via Promise.all above (which would
+  // fail the whole detail view on a 404).
+  let alertConfig = null;
+  let recipients = [];
+  try {
+    alertConfig = await api('GET', '/api/v1/customers/' + id + '/alert-configuration');
+    recipients = await api('GET', '/api/v1/customers/' + id + '/alert-configuration/recipients');
+  } catch (e) {
+    alertConfig = null;
+  }
+  cache.alertConfig = alertConfig;
+
   let html = '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
     '<div><div class="customer-detail-name">' + customer.name + '</div>' +
     '<div class="customer-detail-sub">' + customer.code + ' · ' + (customer.region || 'no region') + ' · ' + customer.contactEmail + ' · ' + customer.status + '</div></div>' +
@@ -647,13 +716,79 @@ async function renderCustomerDetail(id) {
   html += '<div class="subsection"><div style="display:flex; justify-content:space-between; align-items:center;"><h4>Assigned Metrics</h4>' +
     '<button class="btn small secondary" onclick="openAssignMetric()">+ Assign Metric</button></div>';
   if (assigned.length === 0) html += '<div class="empty-note">No metrics assigned yet.</div>';
+  cache.customerMetrics = assigned;
   assigned.forEach(a => {
-    html += '<div class="inline-list-item"><span>' + a.metric.name + ' <span class="mono">' + a.metric.serviceKey + '</span></span>' +
-      '<span class="tag">' + (a.enabled ? 'enabled' : 'disabled') + '</span></div>';
+    html += '<div class="inline-list-item"><span>' + a.metric.name + ' <span class="mono">' + a.metric.serviceKey + '</span>' +
+      '<div class="row-sub">' + a.serviceName + ' · ' + a.gatewayEndpointUrl + ' · ' + a.namespace + '</div></span>' +
+      '<span><span class="tag">' + (a.enabled ? 'enabled' : 'disabled') + '</span> ' +
+      '<button class="btn small secondary" onclick="openSoapConfig(' + a.id + ')">Edit SOAP Config</button></span></div>';
   });
   html += '</div>';
 
+  html += '<div class="subsection"><div style="display:flex; justify-content:space-between; align-items:center;"><h4>Alert Settings</h4>' +
+    '<button class="btn small secondary" onclick="openAlertConfig()">' + (alertConfig ? 'Edit' : '+ Configure') + '</button></div>';
+  if (!alertConfig) {
+    html += '<div class="empty-note">No alert configuration yet.</div>';
+  } else {
+    html += '<div class="inline-list-item"><span>Frequency: ' + alertConfig.frequency + '</span>' +
+      '<span class="tag">' + (alertConfig.enabled ? 'enabled' : 'disabled') + '</span></div>';
+    html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;"><span class="row-sub">Recipients</span>' +
+      '<button class="btn small secondary" onclick="openAddRecipient()">+ Add Recipient</button></div>';
+    if (recipients.length === 0) html += '<div class="empty-note">No recipients yet.</div>';
+    recipients.forEach(r => {
+      html += '<div class="inline-list-item"><span>' + r.email + '</span>' +
+        '<button class="btn small secondary" onclick="removeRecipient(' + id + ', ' + r.id + ')">Remove</button></div>';
+    });
+  }
+  html += '</div>';
+
   el('customer-detail').innerHTML = html;
+}
+
+function openAlertConfig() {
+  const cfg = cache.alertConfig;
+  el('alert-frequency').value = cfg ? cfg.frequency : 'EVERY_FAILURE';
+  el('alert-enabled').checked = cfg ? cfg.enabled : true;
+  el('alert-error').textContent = '';
+  openOverlay('alert-overlay');
+}
+
+async function submitAlertConfig() {
+  el('alert-error').textContent = '';
+  try {
+    await api('PUT', '/api/v1/customers/' + selectedCustomerId + '/alert-configuration', {
+      frequency: el('alert-frequency').value,
+      enabled: el('alert-enabled').checked
+    });
+    closeOverlay('alert-overlay');
+    renderCustomers();
+  } catch (e) { el('alert-error').textContent = e.message; }
+}
+
+function openAddRecipient() {
+  el('recipient-email').value = '';
+  el('recipient-error').textContent = '';
+  openOverlay('recipient-overlay');
+}
+
+async function submitAddRecipient() {
+  el('recipient-error').textContent = '';
+  try {
+    await api('POST', '/api/v1/customers/' + selectedCustomerId + '/alert-configuration/recipients', {
+      email: el('recipient-email').value
+    });
+    closeOverlay('recipient-overlay');
+    renderCustomers();
+  } catch (e) { el('recipient-error').textContent = e.message; }
+}
+
+async function removeRecipient(customerId, recipientId) {
+  try {
+    await api('DELETE', '/api/v1/customers/' + customerId + '/alert-configuration/recipients/' + recipientId);
+    renderCustomers();
+  } catch (e) {
+    alert('Could not remove recipient: ' + e.message);
+  }
 }
 
 function toggleCustEnvField(envKey) {
@@ -781,16 +916,47 @@ async function openAssignMetric() {
   cache.metrics = await api('GET', '/api/v1/metrics');
   const sel = el('assign-metric');
   sel.innerHTML = cache.metrics.map(m => '<option value="' + m.id + '">' + m.name + ' (' + m.serviceKey + ')</option>').join('');
+  el('assign-gateway-url').value = '';
+  el('assign-service-name').value = '';
+  el('assign-namespace').value = '';
   el('assign-error').textContent = '';
   openOverlay('assign-overlay');
 }
 async function assignMetricSubmit() {
   el('assign-error').textContent = '';
   try {
-    await api('POST', '/api/v1/customers/' + selectedCustomerId + '/metrics', { metricId: Number(el('assign-metric').value) });
+    await api('POST', '/api/v1/customers/' + selectedCustomerId + '/metrics', {
+      metricId: Number(el('assign-metric').value),
+      gatewayEndpointUrl: el('assign-gateway-url').value,
+      serviceName: el('assign-service-name').value,
+      namespace: el('assign-namespace').value
+    });
     closeOverlay('assign-overlay');
     renderCustomers();
   } catch (e) { el('assign-error').textContent = e.message; }
+}
+
+function openSoapConfig(customerMetricId) {
+  const cm = (cache.customerMetrics || []).find(x => x.id === customerMetricId);
+  if (!cm) return;
+  el('soap-config-gateway-url').value = cm.gatewayEndpointUrl || '';
+  el('soap-config-service-name').value = cm.serviceName || '';
+  el('soap-config-namespace').value = cm.namespace || '';
+  el('soap-config-error').textContent = '';
+  soapConfigTargetId = customerMetricId;
+  openOverlay('soap-config-overlay');
+}
+async function submitSoapConfig() {
+  el('soap-config-error').textContent = '';
+  try {
+    await api('PATCH', '/api/v1/customers/' + selectedCustomerId + '/metrics/' + soapConfigTargetId + '/soap-config', {
+      gatewayEndpointUrl: el('soap-config-gateway-url').value,
+      serviceName: el('soap-config-service-name').value,
+      namespace: el('soap-config-namespace').value
+    });
+    closeOverlay('soap-config-overlay');
+    renderCustomers();
+  } catch (e) { el('soap-config-error').textContent = e.message; }
 }
 
 // ================= METRICS =================
@@ -1038,8 +1204,8 @@ async function renderConfig() {
   html += '</tbody></table></div>';
 
   html += '<div class="panel"><h3>Spring Boot Server Settings</h3>' +
-    '<div class="config-note">' +
-    '</div>' +
+    '<div class="config-note">These fields are shown for reference only — there is no backend endpoint to save arbitrary server settings like this. ' +
+    'The actual database connection, port, and other server config are set in <span class="mono">application.yml</span> on the server itself, not through this UI.</div>' +
     '<div class="field-row" style="margin-top:14px;">' +
     '<div class="field"><label>API Base URL</label><input value="' + window.location.origin + '/api/v1" disabled></div>' +
     '<div class="field"><label>Database</label><input value="see application.yml (H2 or Postgres profile)" disabled></div>' +

@@ -1,18 +1,10 @@
 target/
 
-# IDE metadata
+# IDE files
 .idea/
 *.iml
-.classpath
-.project
-.settings/
 .vscode/
 
 # OS files
 .DS_Store
 Thumbs.db
-
-# Local environment files
-.env
-.env.*
-!.env.example

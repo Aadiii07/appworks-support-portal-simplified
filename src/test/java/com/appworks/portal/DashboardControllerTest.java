@@ -72,6 +72,11 @@ class DashboardControllerTest {
     private void assignMetricToCustomer(Long customerId, Long metricId) throws Exception {
         CustomerMetricRequest request = new CustomerMetricRequest();
         request.setMetricId(metricId);
+        // Required now that SOAP API config is part of assignment; mock values,
+        // not exercised by this test's assertions.
+        request.setGatewayEndpointUrl("https://mock.appworks.example.com/gateway");
+        request.setServiceName("MockService");
+        request.setNamespace("http://mock.appworks.example.com/ns");
 
         mockMvc.perform(post("/api/v1/customers/" + customerId + "/metrics")
                         .contentType(MediaType.APPLICATION_JSON)

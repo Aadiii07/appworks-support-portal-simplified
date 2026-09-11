@@ -83,6 +83,9 @@ class RunHistoryControllerTest {
     private void assignMetricToCustomer(Long customerId, Long metricId) throws Exception {
         CustomerMetricRequest request = new CustomerMetricRequest();
         request.setMetricId(metricId);
+        request.setGatewayEndpointUrl("https://mock.appworks.example.com/gateway");
+        request.setServiceName("MockService");
+        request.setNamespace("http://mock.appworks.example.com/ns");
 
         mockMvc.perform(post("/api/v1/customers/" + customerId + "/metrics")
                         .contentType(MediaType.APPLICATION_JSON)

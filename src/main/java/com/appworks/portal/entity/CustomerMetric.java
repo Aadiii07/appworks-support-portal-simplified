@@ -42,6 +42,20 @@ public class CustomerMetric {
     @Builder.Default
     private boolean enabled = true;
 
+    // The SOAP API configuration for this customer's use of this metric
+    // (requirement: "configure SOAP APIs for each customer, including Gateway
+    // Endpoint URL, Service Name, and Namespace"). Kept here rather than on the
+    // shared Metric catalog entry because these values are specific to this
+    // customer's assignment, not shared across customers.
+    @Column(name = "gateway_endpoint_url")
+    private String gatewayEndpointUrl;
+
+    @Column(name = "service_name")
+    private String serviceName;
+
+    @Column(name = "namespace")
+    private String namespace;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

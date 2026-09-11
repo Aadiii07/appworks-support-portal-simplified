@@ -2,6 +2,7 @@ package com.appworks.portal.service;
 
 import com.appworks.portal.dto.CustomerMetricRequest;
 import com.appworks.portal.dto.CustomerMetricResponse;
+import com.appworks.portal.dto.CustomerMetricSoapConfigRequest;
 import com.appworks.portal.entity.Customer;
 import com.appworks.portal.entity.CustomerMetric;
 import com.appworks.portal.entity.Metric;
@@ -44,6 +45,9 @@ public class CustomerMetricService {
                 .customer(customer)
                 .metric(metric)
                 .enabled(request.getEnabled() == null || request.getEnabled())
+                .gatewayEndpointUrl(request.getGatewayEndpointUrl())
+                .serviceName(request.getServiceName())
+                .namespace(request.getNamespace())
                 .build();
 
         CustomerMetric saved = customerMetricRepository.save(customerMetric);
@@ -61,6 +65,16 @@ public class CustomerMetricService {
     public CustomerMetricResponse updateEnabled(Long customerId, Long customerMetricId, boolean enabled) {
         CustomerMetric customerMetric = getEntityOrThrow(customerId, customerMetricId);
         customerMetric.setEnabled(enabled);
+        CustomerMetric saved = customerMetricRepository.save(customerMetric);
+        return CustomerMetricResponse.fromEntity(saved);
+    }
+
+    public CustomerMetricResponse updateSoapConfig(Long customerId, Long customerMetricId,
+                                                     CustomerMetricSoapConfigRequest request) {
+        CustomerMetric customerMetric = getEntityOrThrow(customerId, customerMetricId);
+        customerMetric.setGatewayEndpointUrl(request.getGatewayEndpointUrl());
+        customerMetric.setServiceName(request.getServiceName());
+        customerMetric.setNamespace(request.getNamespace());
         CustomerMetric saved = customerMetricRepository.save(customerMetric);
         return CustomerMetricResponse.fromEntity(saved);
     }

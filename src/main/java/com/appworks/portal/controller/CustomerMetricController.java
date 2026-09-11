@@ -3,6 +3,7 @@ package com.appworks.portal.controller;
 import com.appworks.portal.dto.CustomerMetricEnabledRequest;
 import com.appworks.portal.dto.CustomerMetricRequest;
 import com.appworks.portal.dto.CustomerMetricResponse;
+import com.appworks.portal.dto.CustomerMetricSoapConfigRequest;
 import com.appworks.portal.service.CustomerMetricService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,13 @@ public class CustomerMetricController {
                                                                   @Valid @RequestBody CustomerMetricEnabledRequest request) {
         return ResponseEntity.ok(customerMetricService.updateEnabled(
                 customerId, customerMetricId, request.getEnabled()));
+    }
+
+    @PatchMapping("/{customerMetricId}/soap-config")
+    public ResponseEntity<CustomerMetricResponse> updateSoapConfig(@PathVariable Long customerId,
+                                                                     @PathVariable Long customerMetricId,
+                                                                     @Valid @RequestBody CustomerMetricSoapConfigRequest request) {
+        return ResponseEntity.ok(customerMetricService.updateSoapConfig(customerId, customerMetricId, request));
     }
 
     @DeleteMapping("/{customerMetricId}")
